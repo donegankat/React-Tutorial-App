@@ -2,7 +2,20 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 
-// Example usage: <Square value="1" />
+/**
+ * Enum for the possible game states.
+ */
+const GameState = Object.freeze({
+  "Winner": 1,
+  "Draw": 2,
+  "Playing": 3
+});
+
+/**
+ * Creates an HTML element representing a single square on the game board.
+ * Example usage: <Square value="1" />
+ * @param {*} props 
+ */
 function Square(props) {
   var className = "square";
 
@@ -20,7 +33,10 @@ function Square(props) {
   );
 }
 
-// Example usage: <Board />
+/**
+ * Creates the board which contains the 9 Squares.
+ * Example usage: <Board />
+ */
 class Board extends React.Component {
 
   renderSquare(i) {
@@ -55,6 +71,9 @@ class Board extends React.Component {
   }
 }
 
+/**
+ * Manages the entire game, including the Board, Squares, and move history, and manages all actions and game states.
+ */
 class Game extends React.Component {
   constructor(props) {
     super(props);
@@ -69,14 +88,17 @@ class Game extends React.Component {
     }
   }
 
-  // Handles when a square is clicked.
+  /**
+   * Handles when a square is clicked.
+   * @param {*} i 
+   */
   handleClick(i) {
     const history = this.state.history.slice(0, this.state.stepNumber + 1);
     const current = history[history.length - 1];
     const squares = current.squares.slice();
 
     // Ignore the click if there's already a winner or the space is taken.
-    if (calculateWinner(squares) || squares[i]) {
+    if (this.calculateGameStatus(squares).gameStatus === GameState.Winner || squares[i]) {
       return;
     }
 
@@ -91,7 +113,10 @@ class Game extends React.Component {
     });
   }
 
-  // Jumps to a past move/board state.
+  /**
+   * Called when a move in the game's history is clicked. Jumps to the past or future board state.
+   * @param {*} step 
+   */
   jumpTo(step) {
     this.setState({
       stepNumber: step,
@@ -99,23 +124,71 @@ class Game extends React.Component {
     });
   }
 
-  // Reverses the order of the move order history.
-  handleMoveSortClick() {
+  /**
+   * Reverses the order of the move order history.
+   */
+  reverseSortMoveHistory() {
     this.setState({
       areMovesSortedAscending: !this.state.areMovesSortedAscending
     });
   }
 
-  // Renders the Game.
+  /**
+   * Renders the Game.
+   */
   render() {
     const history = this.state.history.slice();
-    const current = history[this.state.stepNumber];
-    const winner = calculateWinner(current?.squares);
+    const currentMove = history[this.state.stepNumber];
+    const gameStatus = this.calculateGameStatus(currentMove?.squares);
 
     // Iterate over the entire move history and build a list of previous moves that the user can click to
     // go back to.
+    const moveHistory = this.buildMoveHistory(history, currentMove);
+
+    let status
+
+    if (gameStatus.gameStatus === GameState.Winner) {
+      status = 'Winner: ' + gameStatus.winningPlayer;
+    } else if (gameStatus.gameStatus === GameState.Draw) {
+      status = 'Draw';
+    } else {
+      status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O');
+    }
+
+    return (
+      <div className="game">
+        <div className="game-board">
+          <Board 
+            squares={currentMove.squares}
+            onClick={(i) => this.handleClick(i)}
+            highlightedSquares={gameStatus?.winningSquares}
+          />
+        </div>
+        <div className="flex-row-break"></div>
+        <div className="game-info">
+          <div className="game-status">{status}</div>
+          <div className="move-history">
+            <div className="move-history-header">
+              Move History
+              <button onClick={() => this.reverseSortMoveHistory()}>Sort {this.state.areMovesSortedAscending ? '\u25B2' : '\u25BC'}</button>
+            </div>
+            <hr/>
+            <ol>{moveHistory}</ol>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * Iterate over the entire move history and build a list of previous moves that the user can click to
+   * go back to.
+   * @param {*} history 
+   * @param {*} currentMove 
+   */
+  buildMoveHistory(history, currentMove) {
     var moves = history.map((step, move) => {
-      var desc = 'Go to game start';
+      var desc = 'Go to game start'; // Default if there was no move yet.
       var moveLocationDescription = '';
 
       // If there was a player action during the move, build a description which indicates what happened
@@ -143,12 +216,12 @@ class Game extends React.Component {
       return (
         <li key={move}>
           <button
-            className={current === step ? 'current-move' : ''}
+            className={currentMove === step ? 'current-move' : ''}
             onClick={() => this.jumpTo(move)}
           >
             {desc}
           </button>
-          <span>{moveLocationDescription}</span>
+          <span className="move-history-location">{moveLocationDescription}</span>
         </li>
       );
     });
@@ -159,34 +232,51 @@ class Game extends React.Component {
       moves = moves.reverse();
     }
 
-    let status
+    return moves;
+  }
 
-    if (winner) {
-      status = 'Winner: ' + winner.player;
-    } else if (calculateIsDraw(current.squares)) {
-      status = 'Draw';
-    } else {
-      status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O');
+  /**
+   * Determines the current state of the game. If there's a winner, this returns the winning player and the
+   * list of Squares that resulted in the win. If all squares are filled but there's no winner, the state is
+   * a draw.
+   * @param {*} squares 
+   */
+  calculateGameStatus(squares) {
+    const winningLines = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8],
+      [0, 4, 8],
+      [2, 4, 6]
+    ];
+
+    for (let i = 0; i < winningLines.length; i++) {
+      const [a, b, c] = winningLines[i];
+      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
+        return {
+          gameStatus: GameState.Winner,
+          winningPlayer: squares[a],
+          winningSquares: winningLines[i]
+        };
+      }
     }
 
-    return (
-      <div className="game">
-        <div className="game-board">
-          <Board 
-            squares={current.squares}
-            onClick={(i) => this.handleClick(i)}
-            highlightedSquares={winner?.winningSquares}
-          />
-        </div>
-        <div className="game-info">
-          <div>{status}</div>
-          <ol>{moves}</ol>
-          <div>
-            <button onClick={() => this.handleMoveSortClick()}>Sort Moves {this.state.areMovesSortedAscending ? "Descending" : "Ascending"}</button>
-          </div>
-        </div>
-      </div>
-    );
+    for (let i = 0; i < squares.length; i++) {
+      // If at least 1 square is empty, it's not a draw.
+      if (squares[i] === null) {
+        return {
+          gameStatus: GameState.Playing
+        };
+      }
+    }
+
+    // All squares are taken, but there wasn't a winner.
+    return {
+      gameStatus: GameState.Draw
+    };
   }
 }
 
@@ -196,40 +286,3 @@ ReactDOM.render(
   <Game />,
   document.getElementById('root')
 );
-
-function calculateWinner(squares) {
-  const lines = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8],
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8],
-    [0, 4, 8],
-    [2, 4, 6]
-  ];
-
-  for (let i = 0; i < lines.length; i++) {
-    const [a, b, c] = lines[i];
-    if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-      return {
-        player: squares[a],
-        winningSquares: lines[i]
-      };
-    }
-  }
-
-  return null;
-}
-
-function calculateIsDraw(squares) {
-  for (let i = 0; i < squares.length; i++) {
-    // If at least 1 square is empty, it's not a draw.
-    if (squares[i] === null) {
-      return false;
-    }
-  }
-
-  // All squares are taken. This is either a victory or a draw (but there's a separate function for calculating victory).
-  return true;
-}

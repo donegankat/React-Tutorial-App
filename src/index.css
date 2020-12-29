@@ -7,14 +7,17 @@ ol, ul {
   padding-left: 30px;
 }
 
+.game-board {
+  height: min-content;
+  padding: 20px;
+  border: 5px double;
+  background: cadetblue;
+}
+
 .board-row:after {
   clear: both;
   content: "";
   display: table;
-}
-
-.status {
-  margin-bottom: 10px;
 }
 
 .square {
@@ -47,12 +50,41 @@ ol, ul {
 .game {
   display: flex;
   flex-direction: row;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
-.game-info {
-  margin-left: 20px;
+.game-status {
+  font-size: large;
+  font-weight: bold;
+}
+
+.game-status, .move-history-header {
+  text-align: center;
+}
+
+.move-history {
+  margin-top: 15px;
+  border: 5px groove;
+  padding: 10px 30px;
+}
+
+.move-history-header {
+  font-size: medium;
+}
+
+.move-history-header > button {
+  margin-left: 10px;
+}
+
+.move-history-location {
+  margin-left: 5px;
 }
 
 .current-move {
   background: lightgrey;
+}
+
+.flex-row-break {
+  flex-basis: 100%;
 }
